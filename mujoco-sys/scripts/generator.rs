@@ -32,7 +32,9 @@ impl ParseCallbacks for EnumPrefixStripper {
                 _ => None,
             };
             if let Some(s) = edge_case {
-                println!("Found edge case! {enum_name}::{original} => {enum_name}::{s}");
+                println!(
+                    "Found edge case! {enum_name}::{original} => {enum_name}::{s}"
+                );
                 return Some(s.to_owned());
             }
         }
@@ -73,7 +75,7 @@ fn generate() {
 
     let builder_helper = |b: bindgen::Builder, whitelist: &str| -> bindgen::Builder {
         b.header_contents("wrapper.h", r#"#include "mujoco/mujoco.h""#)
-            .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+            .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
             .allowlist_type(whitelist)
             .allowlist_function(whitelist)
             .allowlist_var(whitelist)

@@ -8,6 +8,12 @@ These bindings require that MuJoCo be installed before building. The build syste
 
 This package relies on MuJoCo headers and binaries installed in your system. Hence current versioning may change for CI but with no changes to source code of Rust bindings.
 
+Test running
+
+```bash
+LD_LIBRARY_PATH=~/.local/mujoco/lib cargo tes
+```
+
 ## Usage
 
 These wrappers use `mujoco-rs-sys` to provide rust bindings to the MuJoCo C API. The `mujoco-rs-sys` crate is not intended to be used directly, but instead is used by `mujoco-rust` to provide a more idiomatic rust interface to the MuJoCo API.

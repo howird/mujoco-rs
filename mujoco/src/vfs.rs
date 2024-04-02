@@ -1,6 +1,3 @@
-pub use mujoco_rs_sys::no_render::mjMAXVFS as MAX_FILES;
-pub use mujoco_rs_sys::no_render::mjMAXVFSNAME as MAX_FILENAME_LEN;
-
 use std::ffi::{CStr, CString};
 
 /// An error when adding a file to a [`Vfs`] via [`Vfs::add_file()`]
