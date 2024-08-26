@@ -52,23 +52,6 @@ fn load_model() -> *mut mjModel {
             vfs_uninit
         }
     };
-    {
-        assert_eq!(
-            unsafe {
-                mj_makeEmptyFileVFS(
-                    &mut *vfs,
-                    XML_NAME.as_ptr(),
-                    XML.len() as std::os::raw::c_int,
-                )
-            },
-            0
-        );
-        let file_idx = unsafe { mj_findFileVFS(&*vfs, XML_NAME.as_ptr()) };
-        assert_ne!(file_idx, -1);
-        let file_buf: *mut std::os::raw::c_void = vfs.filedata[file_idx as usize];
-        let file_buf = file_buf as *mut std::os::raw::c_uchar;
-        unsafe { std::ptr::copy_nonoverlapping(XML.as_ptr(), file_buf, XML.len()) };
-    }
 
     let model;
     unsafe {

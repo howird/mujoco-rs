@@ -11,7 +11,7 @@ This package relies on MuJoCo headers and binaries installed in your system. Hen
 Test running
 
 ```bash
-LD_LIBRARY_PATH=~/.local/mujoco/lib cargo tes
+LD_LIBRARY_PATH=~/.local/mujoco/lib cargo test
 ```
 
 ## Usage
