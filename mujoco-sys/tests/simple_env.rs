@@ -3,40 +3,30 @@ use mujoco_rs_sys::*;
 // use mujoco_rs_sys::*;
 use std::ffi::{CStr, CString};
 
-const XML: &str = r#"
-<mujoco>
-   <worldbody>
-      <light diffuse=".5 .5 .5" pos="0 0 3" dir="0 0 -1"/>
-      <geom type="plane" size="1 1 0.1" rgba=".9 0 0 1"/>
-      <body pos="0 0 1">
-         <joint type="free"/>
-         <geom type="box" size=".1 .2 .3" rgba="0 .9 0 1"/>
-      </body>
-   </worldbody>
-</mujoco>
-"#;
+// const XML: &str = r#"
+// <mujoco>
+//    <worldbody>
+//       <light diffuse=".5 .5 .5" pos="0 0 3" dir="0 0 -1"/>
+//       <geom type="plane" size="1 1 0.1" rgba=".9 0 0 1"/>
+//       <body pos="0 0 1">
+//          <joint type="free"/>
+//          <geom type="box" size=".1 .2 .3" rgba="0 .9 0 1"/>
+//       </body>
+//    </worldbody>
+// </mujoco>
+// "#;
 
 lazy_static! {
     static ref MJ_HOME: CString = CString::new(
         dirs::home_dir()
             .expect("Could not locate home directory!")
             .join(".mujoco")
-            .join("mujoco200")
-            .to_str()
-            .unwrap()
-    )
-    .unwrap();
-    static ref MJ_KEY: CString = CString::new(
-        dirs::home_dir()
-            .expect("Could not locate home directory!")
-            .join(".mujoco")
-            .join("mjkey.txt")
             .to_str()
             .unwrap()
     )
     .unwrap();
     static ref XML_NAME: &'static CStr =
-        CStr::from_bytes_with_nul(b"simple.xml\0").unwrap();
+        CStr::from_bytes_with_nul(b"tests/res/simple.xml\0").unwrap();
 }
 
 fn load_model() -> *mut mjModel {
