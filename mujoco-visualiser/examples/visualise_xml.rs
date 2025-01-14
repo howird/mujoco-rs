@@ -12,11 +12,11 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let rendering_simulator = AppBuilder::from_xml(args.xml)
+    let app = AppBuilder::from_xml(args.xml)
         .unwrap()
         .with_default_rendering()
         .build();
 
     // Run the simulator
-    rendering_simulator.run_app();
+    app.run_app();
 }
