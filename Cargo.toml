@@ -3,4 +3,7 @@
 members = [
     "mujoco",
     "mujoco-sys",
+    "mujoco-visualiser",
 ]
+
+resolver = "2"

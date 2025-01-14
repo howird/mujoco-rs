@@ -1,0 +1,27 @@
+[package]
+name = "mujoco-visualiser"
+version = "0.1.0"
+edition = "2021"
+description = "MuJoCo bindings for Rust with visualiser application wrapper"
+readme = "../README.md"
+repository = "https://github.com/Nickick-ICRS/mjc-rs/"
+homepage = "https://github.com/Nickick-ICRS/mjc-rs/"
+license = "MIT"
+keywords = ["mujoco", "rl", "ml", "physics", "robotics"]
+categories = ["api-bindings", "science::robotics", "simulation"]
+
+[dependencies]
+mujoco-rust = { version = "0.0.8", path = "../mujoco" }
+mujoco-rs-sys = { version = "0.0.6", path = "../mujoco-sys" }
+glium = { version = "0.36.0" }              
+glutin-winit = { version = "0.5" }
+# For examples
+clap = { version = "4", features=["derive"] }
+
+[lib]
+name = "mujoco_visualiser"
+path = "src/lib.rs"
+
+[[bin]]
+name = "visualise_xml"
+path = "examples/visualise_xml.rs"
