@@ -1,5 +1,5 @@
 [package]
-name = "mujoco-visualiser"
+name = "mujoco-app"
 version = "0.1.0"
 edition = "2021"
 description = "MuJoCo bindings for Rust with visualiser application wrapper"
@@ -19,7 +19,7 @@ glutin-winit = { version = "0.5" }
 clap = { version = "4", features=["derive"] }
 
 [lib]
-name = "mujoco_visualiser"
+name = "mujoco_app"
 path = "src/lib.rs"
 
 [[bin]]

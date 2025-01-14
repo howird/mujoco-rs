@@ -861,6 +861,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mujoco-app"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "glium",
+ "glutin-winit",
+ "mujoco-rs-sys",
+ "mujoco-rust",
+]
+
+[[package]]
 name = "mujoco-rs-sys"
 version = "0.0.6"
 dependencies = [
@@ -879,17 +890,6 @@ dependencies = [
  "lazy_static",
  "mujoco-rs-sys",
  "nalgebra",
-]
-
-[[package]]
-name = "mujoco-visualiser"
-version = "0.1.0"
-dependencies = [
- "clap",
- "glium",
- "glutin-winit",
- "mujoco-rs-sys",
- "mujoco-rust",
 ]
 
 [[package]]

@@ -1,5 +1,5 @@
 use clap::Parser;
-use mujoco_visualiser::AppBuilder;
+use mujoco_app::AppBuilder;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about=None)]
