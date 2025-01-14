@@ -1,17 +1,26 @@
 use glium::{
     glutin::surface::WindowSurface,
-    winit::{application::ApplicationHandler, event::{ElementState, KeyEvent}, event_loop::EventLoop, keyboard::{Key, KeyCode, SmolStr}, window::Window},
+    winit::{
+        application::ApplicationHandler,
+        event::{ElementState, KeyEvent},
+        event_loop::EventLoop,
+        keyboard::{Key, KeyCode, SmolStr},
+        window::Window,
+    },
     Display,
 };
 
 use mujoco_rs_sys::{
-    mjr_makeContext, mjr_overlay, mjr_readPixels, mjtCatBit, mjtFont, mjtGridPos, mjvCamera,
-    mjvOption, mjvPerturb, mjvScene, mjv_defaultFreeCamera, mjv_defaultOption, mjv_defaultPerturb,
-    mjv_makeScene, mjv_updateScene,
+    mjr_makeContext, mjr_overlay, mjr_readPixels, mjtCatBit, mjtFont, mjtGridPos,
+    mjvCamera, mjvOption, mjvPerturb, mjvScene, mjv_defaultFreeCamera,
+    mjv_defaultOption, mjv_defaultPerturb, mjv_makeScene, mjv_updateScene,
     render::{mjrContext, mjrRect, mjr_render},
 };
 use std::{
-    num::NonZeroU32, sync::{Arc, Mutex}, thread, time::{Duration, Instant}
+    num::NonZeroU32,
+    sync::{Arc, Mutex},
+    thread,
+    time::{Duration, Instant},
 };
 
 use glium::{
@@ -24,7 +33,9 @@ use glium::{
         surface::SurfaceAttributesBuilder,
     },
     texture::RawImage2d,
-    winit::{event::WindowEvent, keyboard::NamedKey, raw_window_handle::HasWindowHandle},
+    winit::{
+        event::WindowEvent, keyboard::NamedKey, raw_window_handle::HasWindowHandle,
+    },
     Surface,
 };
 
@@ -85,11 +96,11 @@ fn loop_physics_threaded(
     let timestep = sim.lock().unwrap().state.time();
     let mut step_sim = || {
         let locked_sim = sim.lock().unwrap();
-            // Apply control law here
-            if let Some(fun) = ctrl_cb.as_mut() {
-                let control = fun(&locked_sim);
-                locked_sim.control(&control);
-            }
+        // Apply control law here
+        if let Some(fun) = ctrl_cb.as_mut() {
+            let control = fun(&locked_sim);
+            locked_sim.control(&control);
+        }
         locked_sim.step();
     };
     loop {
@@ -102,7 +113,7 @@ fn loop_physics_threaded(
             PhysicsRunningState::Paused => {
                 last_updated = Instant::now();
                 thread::sleep(Duration::from_millis(1));
-            },
+            }
             PhysicsRunningState::RateLimited => {
                 let elapsed_real = last_updated.elapsed();
                 let num_steps = (elapsed_real.as_secs_f64() / timestep).floor() as u32;
@@ -111,7 +122,7 @@ fn loop_physics_threaded(
                 }
                 last_updated += Duration::from_secs_f64(num_steps as f64 * timestep);
                 thread::sleep(Duration::from_secs_f64(timestep));
-            },
+            }
             PhysicsRunningState::Uncapped => {
                 step_sim();
                 last_updated = Instant::now();
@@ -132,7 +143,8 @@ pub struct MujocoApp {
 impl MujocoApp {
     pub fn run_app(mut self) {
         if self.rendering.is_some() {
-            let event_loop = self.rendering.as_mut().unwrap().event_loop.take().unwrap();
+            let event_loop =
+                self.rendering.as_mut().unwrap().event_loop.take().unwrap();
             self.launch_physics_thread();
             event_loop.run_app(&mut self).unwrap();
         }
@@ -148,11 +160,7 @@ impl MujocoApp {
         let physics_state_clone = self.physics_state.clone();
         let ctrl_cb = self.ctrl_cb.take();
         thread::spawn(move || {
-            loop_physics_threaded(
-                sim_clone,
-                physics_state_clone,
-                ctrl_cb,
-            );
+            loop_physics_threaded(sim_clone, physics_state_clone, ctrl_cb);
         });
     }
 
@@ -209,7 +217,11 @@ impl MujocoApp {
                         &mut rendering.state.scn,
                     );
                     // Render to a frame buffer
-                    mjr_render(viewport, &mut rendering.state.scn, &rendering.state.con);
+                    mjr_render(
+                        viewport,
+                        &mut rendering.state.scn,
+                        &rendering.state.con,
+                    );
                     // Overlay text
                     mjr_overlay(
                         mjtFont::NORMAL as i32,
@@ -248,8 +260,7 @@ impl MujocoApp {
 }
 
 impl ApplicationHandler for MujocoApp {
-    fn resumed(&mut self, _event_loop: &glium::winit::event_loop::ActiveEventLoop) {
-    }
+    fn resumed(&mut self, _event_loop: &glium::winit::event_loop::ActiveEventLoop) {}
 
     fn window_event(
         &mut self,
@@ -264,48 +275,51 @@ impl ApplicationHandler for MujocoApp {
             WindowEvent::RedrawRequested => {
                 self.render();
             }
-            WindowEvent::KeyboardInput { 
-                event: KeyEvent {
-                    logical_key: Key::Named(NamedKey::Space),
-                    state: ElementState::Pressed,
-                    repeat: false,
-                    ..
-                },
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        logical_key: Key::Named(NamedKey::Space),
+                        state: ElementState::Pressed,
+                        repeat: false,
+                        ..
+                    },
                 ..
             } => {
                 let mut locked_value = self.physics_state.lock().unwrap();
                 match locked_value.running_state {
                     PhysicsRunningState::Paused => {
                         if self.frame_rate_limited {
-                            locked_value.running_state = PhysicsRunningState::RateLimited;
-                        }
-                        else {
+                            locked_value.running_state =
+                                PhysicsRunningState::RateLimited;
+                        } else {
                             locked_value.running_state = PhysicsRunningState::Uncapped;
                         }
-                    },
+                    }
                     _ => {
                         locked_value.running_state = PhysicsRunningState::Paused;
                     }
                 }
             }
-            WindowEvent::KeyboardInput { 
-                event: KeyEvent {
-                    logical_key: Key::Named(NamedKey::Escape),
-                    state: ElementState::Pressed,
-                    repeat: false,
-                    ..
-                },
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        logical_key: Key::Named(NamedKey::Escape),
+                        state: ElementState::Pressed,
+                        repeat: false,
+                        ..
+                    },
                 ..
             } => {
                 event_loop.exit();
             }
-            WindowEvent::KeyboardInput { 
-                event: KeyEvent {
-                    logical_key: Key::Character(c),
-                    state: ElementState::Pressed,
-                    repeat: false,
-                    ..
-                },
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        logical_key: Key::Character(c),
+                        state: ElementState::Pressed,
+                        repeat: false,
+                        ..
+                    },
                 ..
             } => {
                 if c == "u" {
@@ -313,8 +327,7 @@ impl ApplicationHandler for MujocoApp {
                     let mut locked_value = self.physics_state.lock().unwrap();
                     if self.frame_rate_limited {
                         locked_value.running_state = PhysicsRunningState::RateLimited;
-                    }
-                    else {
+                    } else {
                         locked_value.running_state = PhysicsRunningState::Uncapped;
                     }
                 }
@@ -323,7 +336,10 @@ impl ApplicationHandler for MujocoApp {
         }
     }
 
-    fn about_to_wait(&mut self, _event_loop: &glium::winit::event_loop::ActiveEventLoop) {
+    fn about_to_wait(
+        &mut self,
+        _event_loop: &glium::winit::event_loop::ActiveEventLoop,
+    ) {
         if let Some(rendering) = self.rendering.as_ref() {
             rendering.window.request_redraw();
         }
@@ -422,7 +438,8 @@ impl AppBuilder {
             Ok(self)
         } else {
             Err(AppBuilderErr(
-                "'with_custom_render_callback' Requires rendering to be setup already!".to_string(),
+                "'with_custom_render_callback' Requires rendering to be setup already!"
+                    .to_string(),
             ))
         }
     }
@@ -434,7 +451,8 @@ fn build_mujoco_gl_context(
 ) -> (glium::winit::window::Window, glium::Display<WindowSurface>) {
     let window_attributes = Window::default_attributes();
     let config_template_builder = ConfigTemplateBuilder::new();
-    let display_builder = DisplayBuilder::new().with_window_attributes(Some(window_attributes));
+    let display_builder =
+        DisplayBuilder::new().with_window_attributes(Some(window_attributes));
 
     let (window, gl_config) = event_loop
         .build(display_builder, config_template_builder, |mut configs| {
