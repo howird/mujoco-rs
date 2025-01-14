@@ -1,6 +1,6 @@
 use glium::{
     glutin::surface::WindowSurface,
-    winit::{application::ApplicationHandler, event_loop::EventLoop, window::Window},
+    winit::{application::ApplicationHandler, event::{ElementState, KeyEvent}, event_loop::EventLoop, keyboard::{Key, KeyCode, SmolStr}, window::Window},
     Display,
 };
 
@@ -11,10 +11,7 @@ use mujoco_rs_sys::{
     render::{mjrContext, mjrRect, mjr_render},
 };
 use std::{
-    num::NonZeroU32,
-    sync::{Arc, Mutex},
-    thread,
-    time::Duration,
+    num::NonZeroU32, sync::{Arc, Mutex}, thread, time::{Duration, Instant}
 };
 
 use glium::{
@@ -65,33 +62,71 @@ struct Rendering {
     render_cb: Option<RenderFun>,
 }
 
-pub struct MujocoApp {
-    ctrl_cb: Option<CtrlFun>,
-    rendering: Option<Rendering>,
-    sim: Arc<Mutex<mujoco_rust::Simulation>>,
-    is_simulating: Arc<Mutex<bool>>,
-    frame_rate_limited: Arc<Mutex<bool>>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PhysicsRunningState {
+    Paused,
+    RateLimited,
+    Uncapped,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PhysicsState {
+    running_state: PhysicsRunningState,
+    frame_rate: f32,
 }
 
 fn loop_physics_threaded(
     sim: Arc<Mutex<mujoco_rust::Simulation>>,
-    is_simulating: Arc<Mutex<bool>>,
-    _lock_framerate: Arc<Mutex<bool>>,
+    state: Arc<Mutex<PhysicsState>>,
     mut ctrl_cb: Option<CtrlFun>,
 ) {
-    loop {
-        if *is_simulating.lock().unwrap() {
-            let locked_sim = sim.lock().unwrap();
+    let mut last_updated = Instant::now();
+    // We should have taken one step, so we know the timestep
+    let timestep = sim.lock().unwrap().state.time();
+    let mut step_sim = || {
+        let locked_sim = sim.lock().unwrap();
+            // Apply control law here
             if let Some(fun) = ctrl_cb.as_mut() {
                 let control = fun(&locked_sim);
                 locked_sim.control(&control);
             }
-            // Apply control law here
-            locked_sim.step();
-        } else {
-            thread::sleep(Duration::from_millis(1));
+        locked_sim.step();
+    };
+    loop {
+        let current_state: PhysicsState;
+        {
+            let locked = state.lock().unwrap();
+            current_state = (*locked).clone()
+        }
+        match current_state.running_state {
+            PhysicsRunningState::Paused => {
+                last_updated = Instant::now();
+                thread::sleep(Duration::from_millis(1));
+            },
+            PhysicsRunningState::RateLimited => {
+                let elapsed_real = last_updated.elapsed();
+                let num_steps = (elapsed_real.as_secs_f64() / timestep).floor() as u32;
+                for _ in 0..num_steps {
+                    step_sim();
+                }
+                last_updated += Duration::from_secs_f64(num_steps as f64 * timestep);
+                thread::sleep(Duration::from_secs_f64(timestep));
+            },
+            PhysicsRunningState::Uncapped => {
+                step_sim();
+                last_updated = Instant::now();
+            }
         }
     }
+}
+
+pub struct MujocoApp {
+    ctrl_cb: Option<CtrlFun>,
+    rendering: Option<Rendering>,
+    sim: Arc<Mutex<mujoco_rust::Simulation>>,
+    physics_state: Arc<Mutex<PhysicsState>>,
+    frame_rate_limited: bool,
+    last_render: Instant,
 }
 
 impl MujocoApp {
@@ -110,30 +145,35 @@ impl MujocoApp {
 
     fn launch_physics_thread(&mut self) {
         let sim_clone = self.sim.clone();
-        let is_simulating_clone = self.is_simulating.clone();
-        let is_frame_rate_limited_clone = self.frame_rate_limited.clone();
+        let physics_state_clone = self.physics_state.clone();
         let ctrl_cb = self.ctrl_cb.take();
         thread::spawn(move || {
             loop_physics_threaded(
                 sim_clone,
-                is_simulating_clone,
-                is_frame_rate_limited_clone,
+                physics_state_clone,
                 ctrl_cb,
             );
         });
     }
 
     fn loop_physics(&mut self) {
-        let sim = self.sim.lock().unwrap();
-        if let Some(fun) = self.ctrl_cb.as_mut() {
-            let control = fun(&sim);
-            sim.control(&control);
+        loop {
+            let sim = self.sim.lock().unwrap();
+            if let Some(fun) = self.ctrl_cb.as_mut() {
+                let control = fun(&sim);
+                sim.control(&control);
+            }
+            sim.step();
         }
-        sim.step();
     }
 
     fn render(&mut self) {
         if let Some(rendering) = self.rendering.as_mut() {
+            let fps = 1. / self.last_render.elapsed().as_secs_f32();
+            self.last_render = Instant::now();
+            {
+                self.physics_state.lock().unwrap().frame_rate = fps;
+            }
             let target = rendering.display.draw();
 
             let window_size = rendering.window.inner_size();
@@ -152,8 +192,9 @@ impl MujocoApp {
             {
                 let locked_sim = self.sim.lock().unwrap();
                 let timestamp = format!("Time = {:.3}", locked_sim.state.time());
+                let fps_str = format!("FPS = {:.3}", fps);
                 // Need to include \0 end stric character to send this to a raw C string
-                let null_str = "\0";
+                let _null_str = "\0";
                 let m = locked_sim.model.ptr();
                 let d = locked_sim.state.ptr();
                 unsafe {
@@ -175,7 +216,7 @@ impl MujocoApp {
                         mjtGridPos::TOPLEFT as i32,
                         viewport,
                         timestamp.as_ptr() as *const i8,
-                        null_str.as_ptr() as *const i8,
+                        fps_str.as_ptr() as *const i8,
                         &rendering.state.con,
                     );
                     // Copy framebuffer data to our own RGB array
@@ -208,7 +249,6 @@ impl MujocoApp {
 
 impl ApplicationHandler for MujocoApp {
     fn resumed(&mut self, _event_loop: &glium::winit::event_loop::ActiveEventLoop) {
-        println!("Resumed");
     }
 
     fn window_event(
@@ -224,15 +264,58 @@ impl ApplicationHandler for MujocoApp {
             WindowEvent::RedrawRequested => {
                 self.render();
             }
-            WindowEvent::KeyboardInput { event, .. } => {
-                if event.logical_key == NamedKey::Space {
-                    if event.state.is_pressed() {
-                        let mut locked_value = self.is_simulating.lock().unwrap();
-                        *locked_value = !*locked_value;
+            WindowEvent::KeyboardInput { 
+                event: KeyEvent {
+                    logical_key: Key::Named(NamedKey::Space),
+                    state: ElementState::Pressed,
+                    repeat: false,
+                    ..
+                },
+                ..
+            } => {
+                let mut locked_value = self.physics_state.lock().unwrap();
+                match locked_value.running_state {
+                    PhysicsRunningState::Paused => {
+                        if self.frame_rate_limited {
+                            locked_value.running_state = PhysicsRunningState::RateLimited;
+                        }
+                        else {
+                            locked_value.running_state = PhysicsRunningState::Uncapped;
+                        }
+                    },
+                    _ => {
+                        locked_value.running_state = PhysicsRunningState::Paused;
                     }
-                } else if event.logical_key == NamedKey::Escape {
-                    if event.state.is_pressed() {
-                        event_loop.exit();
+                }
+            }
+            WindowEvent::KeyboardInput { 
+                event: KeyEvent {
+                    logical_key: Key::Named(NamedKey::Escape),
+                    state: ElementState::Pressed,
+                    repeat: false,
+                    ..
+                },
+                ..
+            } => {
+                event_loop.exit();
+            }
+            WindowEvent::KeyboardInput { 
+                event: KeyEvent {
+                    logical_key: Key::Character(c),
+                    state: ElementState::Pressed,
+                    repeat: false,
+                    ..
+                },
+                ..
+            } => {
+                if c == "u" {
+                    self.frame_rate_limited = !self.frame_rate_limited;
+                    let mut locked_value = self.physics_state.lock().unwrap();
+                    if self.frame_rate_limited {
+                        locked_value.running_state = PhysicsRunningState::RateLimited;
+                    }
+                    else {
+                        locked_value.running_state = PhysicsRunningState::Uncapped;
                     }
                 }
             }
@@ -253,6 +336,7 @@ pub struct AppBuilder {
     model: mujoco_rust::Model,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct AppBuilderErr(String);
 
@@ -299,8 +383,12 @@ impl AppBuilder {
             ctrl_cb: self.ctrl_cb,
             rendering: self.render_data,
             sim: Arc::new(Mutex::new(sim)),
-            is_simulating: Arc::new(Mutex::new(false)),
-            frame_rate_limited: Arc::new(Mutex::new(false)),
+            physics_state: Arc::new(Mutex::new(PhysicsState {
+                running_state: PhysicsRunningState::Paused,
+                frame_rate: 60.,
+            })),
+            frame_rate_limited: true,
+            last_render: Instant::now(),
         }
     }
 
