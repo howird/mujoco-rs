@@ -1,2 +1,5 @@
+.direnv/
+MUJOCO_LOG.TXT
+
 /target
 **/generated/*.rs
